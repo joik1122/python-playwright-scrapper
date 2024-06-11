@@ -1,16 +1,17 @@
-from playwright.sync_api import sync_playwright
+from typing import List, Dict, Set
+from playwright.sync_api import sync_playwright, Page
 import bs4
 import csv
 from loguru import logger
 
 
 class JobScraper:
-    def __init__(self, keyword):
-        self.keyword = keyword
-        self.jobs_db = []
-        self.previous_job_links = set()
+    def __init__(self, keyword: str):
+        self.keyword: str = keyword
+        self.jobs_db: List[Dict[str, str]] = []
+        self.previous_job_links: Set[str] = set()
 
-    def fetch_jobs(self, page):
+    def fetch_jobs(self, page: Page) -> None:
         page.goto("https://www.wanted.co.kr")
         page.wait_for_selector("button.Aside_searchButton__Xhqq3").click()
         page.wait_for_selector("input[placeholder='검색어를 입력해 주세요.']").fill(
@@ -56,12 +57,12 @@ class JobScraper:
                 )
 
             if not new_jobs_found:
-                logger.debug(f"no new jobs found for {self.keyword}")
+                logger.debug(f"No new jobs found for {self.keyword}")
                 break
 
-    def save_to_csv(self):
+    def save_to_csv(self) -> None:
         filename = f"{self.keyword}_jobs.csv"
-        logger.debug(f"saving jobs to {filename}")
+        logger.debug(f"Saving jobs to {filename}")
         with open(filename, "w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(["title", "company_name", "reward", "link"])
@@ -71,23 +72,28 @@ class JobScraper:
 
 
 class JobScraperManager:
-    def __init__(self, keywords):
-        self.keywords = keywords
+    def __init__(self, keywords: List[str]):
+        self.keywords: List[str] = keywords
 
-    def run(self):
+    def run(self) -> None:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             page = browser.new_page()
 
             for keyword in self.keywords:
-                logger.debug(f"fetching jobs for {keyword}")
+                logger.debug(f"Fetching jobs for {keyword}")
                 scraper = JobScraper(keyword)
                 scraper.fetch_jobs(page)
                 scraper.save_to_csv()
 
 
 if __name__ == "__main__":
-    logger.debug("start job scraper...")
-    keywords = ["flutter", "python", "java"]
-    manager = JobScraperManager(keywords)
-    manager.run()
+    try:
+        logger.debug("Start job scraper...")
+        keywords = ["flutter", "python", "java"]
+        manager = JobScraperManager(keywords)
+        manager.run()
+    except Exception as e:
+        logger.exception(e)
+    finally:
+        logger.debug("Job scraper finished.")
